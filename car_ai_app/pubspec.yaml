@@ -1,0 +1,32 @@
+name: car_ai_app
+description: A new Flutter project.
+publish_to: 'none' # không publish lên pub.dev
+
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.7.2
+
+dependencies:
+  flutter:
+    sdk: flutter
+  http: ^1.1.0
+  shimmer: ^3.0.0
+  
+  cupertino_icons: ^1.0.8
+  shared_preferences: ^2.2.2
+  permission_handler: ^11.4.0
+  image_picker: ^1.1.2
+  share_plus: ^7.2.1
+  firebase_core: ^3.13.0
+  easy_localization: ^3.0.7+1
+  firebase_auth: ^5.5.3
+  cloud_firestore: ^5.6.7
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+
+flutter:
+  uses-material-design: true
