@@ -1,16 +1,40 @@
 import 'package:flutter/material.dart';
 import '../config/constants.dart';
 import '../models/car_model.dart';
-import '../services/storage_service.dart';
+import '../services/api_service.dart';
 
-class CollectionsPage extends StatelessWidget {
+class CollectionsPage extends StatefulWidget {
   final String langCode;
-
   const CollectionsPage({super.key, required this.langCode});
 
   @override
+  State<CollectionsPage> createState() => _CollectionsPageState();
+}
+
+class _CollectionsPageState extends State<CollectionsPage> {
+  List<CarModel> favorites = [];
+  bool isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadCollection();
+  }
+
+  Future<void> _loadCollection() async {
+    setState(() => isLoading = true);
+    try {
+      favorites = await ApiService().fetchCollection('Favorites');
+    } catch (e) {
+      favorites = [];
+    } finally {
+      if (mounted) setState(() => isLoading = false);
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final isVi = langCode == 'vi';
+    final isVi = widget.langCode == 'vi';
     final theme = Theme.of(context);
 
     return Scaffold(
@@ -18,85 +42,37 @@ class CollectionsPage extends StatelessWidget {
         title: Text(isVi ? 'Bộ sưu tập' : 'Collections'),
         actions: [
           IconButton(
-            icon: const Icon(Icons.add),
-            onPressed: () {
-              // TODO: Implement add collection
-            },
+            icon: const Icon(Icons.refresh),
+            onPressed: _loadCollection,
           ),
         ],
       ),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          _buildCollectionItem(
-            context,
-            icon: Icons.star,
-            title: isVi ? 'Yêu thích' : 'Favorites',
-            count: '2 cars',
-            color: Colors.amber,
-          ),
-          const SizedBox(height: 12),
-          _buildCollectionItem(
-            context,
-            icon: Icons.history,
-            title: isVi ? 'Xe cổ điển' : 'Retro cars',
-            count: '2 cars',
-            color: Colors.blue,
-          ),
-          const SizedBox(height: 12),
-          _buildCollectionItem(
-            context,
-            icon: Icons.diamond,
-            title: isVi ? 'Xe sang' : 'Luxury cars',
-            count: '1 car',
-            color: Colors.purple,
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildCollectionItem(
-    BuildContext context, {
-    required IconData icon,
-    required String title,
-    required String count,
-    required Color color,
-  }) {
-    final theme = Theme.of(context);
-
-    return Card(
-      elevation: 2,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: ListTile(
-        leading: Container(
-          padding: const EdgeInsets.all(8),
-          decoration: BoxDecoration(
-            color: color.withOpacity(0.1),
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Icon(
-            icon,
-            color: color,
-          ),
-        ),
-        title: Text(
-          title,
-          style: theme.textTheme.titleMedium,
-        ),
-        subtitle: Text(
-          count,
-          style: theme.textTheme.bodySmall?.copyWith(
-            color: Colors.grey[600],
-          ),
-        ),
-        trailing: const Icon(Icons.chevron_right),
-        onTap: () {
-          // TODO: Navigate to collection details
-        },
-      ),
+      body: isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : favorites.isEmpty
+              ? Center(child: Text(isVi ? 'Chưa có xe yêu thích.' : 'No favorites yet.'))
+              : ListView.builder(
+                  padding: const EdgeInsets.all(16),
+                  itemCount: favorites.length,
+                  itemBuilder: (context, index) {
+                    final car = favorites[index];
+                    return Card(
+                      elevation: 2,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: ListTile(
+                        leading: const Icon(Icons.star, color: Colors.amber),
+                        title: Text(car.carName),
+                        subtitle: Text(car.brand),
+                        trailing: const Icon(Icons.chevron_right),
+                        onTap: () {
+                          // TODO: Show car details
+                        },
+                      ),
+                    );
+                  },
+                ),
     );
   }
 } 

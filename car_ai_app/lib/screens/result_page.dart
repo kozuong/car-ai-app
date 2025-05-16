@@ -1,136 +1,54 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
+import 'dart:io';
 import 'package:share_plus/share_plus.dart';
-import '../config/constants.dart';
-import '../widgets/car_info_card.dart';
-import '../widgets/performance_stats.dart';
 
 class ResultPage extends StatelessWidget {
   final String imagePath;
   final String carName;
+  final String brand;
   final String year;
   final String price;
   final String power;
   final String acceleration;
   final String topSpeed;
-  final String engine;
-  final String interior;
-  final String features;
-  final String description;
-  final String langCode;
+  final String? description;
+  final List<String>? features;
+  final String? engineDetail;
+  final String? interior;
 
   const ResultPage({
     super.key,
     required this.imagePath,
     required this.carName,
+    required this.brand,
     required this.year,
     required this.price,
     required this.power,
     required this.acceleration,
     required this.topSpeed,
-    required this.engine,
-    required this.interior,
-    this.features = '',
-    required this.description,
-    required this.langCode,
+    this.description,
+    this.features,
+    this.engineDetail,
+    this.interior,
   });
-
-  String _cleanText(String text) {
-    return text
-        .replaceAll('**', '')
-        .replaceAll('*', '')
-        .trim();
-  }
-
-  String _extractCleanDescription(String text) {
-    final cleanText = _cleanText(text);
-    if (cleanText.isEmpty) {
-      return langCode == 'vi' 
-          ? 'Không có thông tin chi tiết.'
-          : 'No detailed information available.';
-    }
-    return cleanText;
-  }
-
-  Future<void> _shareResult(BuildContext context) async {
-    try {
-      final isVi = langCode == 'vi';
-      final file = XFile(imagePath);
-      
-      final text = isVi
-          ? '''
-🚗 Thông tin xe:
-${carName.isNotEmpty ? '• Tên: $carName' : ''}
-${year.isNotEmpty ? '• Năm: $year' : ''}
-${price.isNotEmpty ? '• Giá: $price' : ''}
-${power.isNotEmpty ? '• Công suất: $power' : ''}
-${acceleration.isNotEmpty ? '• Tăng tốc 0-100: $acceleration' : ''}
-${topSpeed.isNotEmpty ? '• Tốc độ tối đa: $topSpeed' : ''}
-${engine.isNotEmpty ? '\n🔧 Động cơ:\n${_cleanText(engine)}' : ''}
-${interior.isNotEmpty ? '\n🛋 Nội thất:\n${_cleanText(interior)}' : ''}
-${description.isNotEmpty ? '\n📝 Mô tả:\n${_cleanText(description)}' : ''}'''
-          : '''
-🚗 Car Information:
-${carName.isNotEmpty ? '• Name: $carName' : ''}
-${year.isNotEmpty ? '• Year: $year' : ''}
-${price.isNotEmpty ? '• Price: $price' : ''}
-${power.isNotEmpty ? '• Power: $power' : ''}
-${acceleration.isNotEmpty ? '• Acceleration 0-60: $acceleration' : ''}
-${topSpeed.isNotEmpty ? '• Top Speed: $topSpeed' : ''}
-${engine.isNotEmpty ? '\n🔧 Engine:\n${_cleanText(engine)}' : ''}
-${interior.isNotEmpty ? '\n🛋 Interior:\n${_cleanText(interior)}' : ''}
-${description.isNotEmpty ? '\n📝 Description:\n${_cleanText(description)}' : ''}''';
-
-      await Share.shareXFiles(
-        [file],
-        text: text,
-        subject: carName,
-      );
-    } catch (e) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              langCode == 'vi'
-                  ? 'Không thể chia sẻ kết quả: ${e.toString()}'
-                  : 'Could not share result: ${e.toString()}',
-              style: const TextStyle(color: Colors.white),
-            ),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    }
-  }
 
   @override
   Widget build(BuildContext context) {
-    final isVi = langCode == 'vi';
     final theme = Theme.of(context);
-    final imageFile = File(imagePath);
-
-    if (!imageFile.existsSync()) {
-      return Scaffold(
-        appBar: AppBar(
-          title: Text(isVi ? 'Kết quả' : 'Result'),
-        ),
-        body: Center(
-          child: Icon(
-            Icons.broken_image,
-            size: 64,
-            color: theme.primaryColor,
-          ),
-        ),
-      );
-    }
-
+    final isVi = Localizations.localeOf(context).languageCode == 'vi';
     return Scaffold(
+      backgroundColor: const Color(0xFFF7F7FA),
       appBar: AppBar(
-        title: Text(isVi ? 'Kết quả' : 'Result'),
+        backgroundColor: const Color(0xFF2196F3),
+        elevation: 0,
+        title: Text(isVi ? 'Kết quả phân tích' : 'Analysis Result', style: const TextStyle(fontWeight: FontWeight.bold)),
+        centerTitle: true,
         actions: [
           IconButton(
             icon: const Icon(Icons.share),
-            onPressed: () => _shareResult(context),
+            onPressed: () {
+              // TODO: Implement share
+            },
           ),
         ],
       ),
@@ -139,119 +57,223 @@ ${description.isNotEmpty ? '\n📝 Description:\n${_cleanText(description)}' : '
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             // Car Image
-            Stack(
-              children: [
-                Image.file(
-                  imageFile,
-                  height: AppConstants.imageHeight,
-                  width: double.infinity,
-                  fit: BoxFit.cover,
-                ),
-                Positioned(
-                  bottom: 0,
-                  left: 0,
-                  right: 0,
-                  child: Container(
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        colors: [
-                          Colors.transparent,
-                          Colors.black.withOpacity(0.7),
-                        ],
-                      ),
-                    ),
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          carName,
-                          style: theme.textTheme.headlineSmall?.copyWith(
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        if (year.isNotEmpty || price.isNotEmpty)
-                          Padding(
-                            padding: const EdgeInsets.only(top: 4),
-                            child: Text(
-                              [
-                                if (year.isNotEmpty) year,
-                                if (price.isNotEmpty) price,
-                              ].join(' • '),
-                              style: theme.textTheme.titleMedium?.copyWith(
-                                color: Colors.white,
-                              ),
-                            ),
-                          ),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
-            ),
-
-            // Performance Stats
-            if (power.isNotEmpty || acceleration.isNotEmpty || topSpeed.isNotEmpty)
-              Padding(
-                padding: const EdgeInsets.all(16),
-                child: PerformanceStats(
-                  power: power,
-                  acceleration: acceleration,
-                  topSpeed: topSpeed,
-                  langCode: langCode,
+            ClipRRect(
+              borderRadius: const BorderRadius.only(
+                bottomLeft: Radius.circular(32),
+                bottomRight: Radius.circular(32),
+              ),
+              child: Image.file(
+                File(imagePath),
+                width: double.infinity,
+                height: 240,
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) => Container(
+                  height: 240,
+                  color: Colors.grey[200],
+                  child: const Icon(Icons.directions_car, size: 120, color: Colors.grey),
                 ),
               ),
-
-            // Description
+            ),
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Overview
+                  // Car name and brand
+                  if (brand.isNotEmpty)
+                    Container(
+                      margin: const EdgeInsets.only(bottom: 8),
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: Colors.blue.shade50,
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      child: Text(
+                        brand,
+                        style: const TextStyle(
+                          color: Color(0xFF2196F3),
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
+                        ),
+                      ),
+                    ),
                   Text(
-                    isVi ? 'Tổng quan' : 'Overview',
-                    style: theme.textTheme.titleLarge,
+                    carName,
+                    style: const TextStyle(fontSize: 26, fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(height: 8),
-                  Text(
-                    _extractCleanDescription(description),
-                    style: theme.textTheme.bodyLarge?.copyWith(
-                      height: 1.5,
+                  // Main stats
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      _StatBox(
+                        value: power,
+                        label: isVi ? 'Công suất' : 'Power',
+                        unit: 'hp',
+                        color: Colors.blue,
+                      ),
+                      _StatBox(
+                        value: acceleration,
+                        label: isVi ? 'Tăng tốc 0-100' : '0-100 km/h',
+                        unit: 's',
+                        color: Colors.green,
+                      ),
+                      _StatBox(
+                        value: topSpeed,
+                        label: isVi ? 'Tốc độ tối đa' : 'Top speed',
+                        unit: 'km/h',
+                        color: Colors.red,
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  // Info table
+                  _InfoTable(
+                    year: year,
+                    price: price,
+                  ),
+                  const SizedBox(height: 18),
+                  // Description Card
+                  _SectionCard(
+                    icon: Icons.description,
+                    title: isVi ? 'Mô tả' : 'Description',
+                    child: Text(
+                      description ?? (isVi ? 'Không có mô tả.' : 'No description.'),
+                      style: const TextStyle(fontSize: 15),
                     ),
                   ),
-
-                  // Engine Specifications
-                  if (engine.isNotEmpty) ...[
-                    const SizedBox(height: 24),
-                    CarInfoCard(
+                  const SizedBox(height: 14),
+                  // Engine Card
+                  if (engineDetail != null && engineDetail!.trim().isNotEmpty)
+                    _SectionCard(
                       icon: Icons.engineering,
-                      title: isVi ? 'Thông số động cơ' : 'Engine Specifications',
-                      content: _cleanText(engine),
-                      langCode: langCode,
+                      title: isVi ? 'Chi tiết động cơ' : 'Engine Details',
+                      child: Text(
+                        engineDetail!,
+                        style: const TextStyle(fontSize: 15),
+                      ),
                     ),
-                  ],
-
-                  // Interior & Features
-                  if (interior.isNotEmpty) ...[
-                    const SizedBox(height: 16),
-                    CarInfoCard(
-                      icon: Icons.event_seat,
+                  if (engineDetail != null && engineDetail!.trim().isNotEmpty)
+                    const SizedBox(height: 14),
+                  // Interior Card
+                  if (interior != null && interior!.trim().isNotEmpty)
+                    _SectionCard(
+                      icon: Icons.chair_alt,
                       title: isVi ? 'Nội thất & Tính năng' : 'Interior & Features',
-                      content: _cleanText(interior),
-                      langCode: langCode,
+                      child: Text(
+                        interior!,
+                        style: const TextStyle(fontSize: 15),
+                      ),
                     ),
-                  ],
-
                   const SizedBox(height: 24),
                 ],
               ),
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _StatBox extends StatelessWidget {
+  final String value, label, unit;
+  final Color color;
+  const _StatBox({required this.value, required this.label, required this.unit, required this.color});
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Text(
+          value.isNotEmpty ? value : '-',
+          style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: color),
+        ),
+        Text(
+          unit,
+          style: TextStyle(fontSize: 13, color: color.withOpacity(0.7)),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          label,
+          style: const TextStyle(fontSize: 13, color: Colors.black54),
+        ),
+      ],
+    );
+  }
+}
+
+class _InfoTable extends StatelessWidget {
+  final String year, price;
+  const _InfoTable({required this.year, required this.price});
+  @override
+  Widget build(BuildContext context) {
+    final isVi = Localizations.localeOf(context).languageCode == 'vi';
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.grey.shade200, width: 1.2),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(isVi ? 'Năm' : 'Year', style: const TextStyle(fontSize: 13, color: Colors.black54)),
+              Text(year.isNotEmpty ? year : '-', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+            ],
+          ),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text(isVi ? 'Giá' : 'Price', style: const TextStyle(fontSize: 13, color: Colors.black54)),
+              Text(price.isNotEmpty ? price : '-', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SectionCard extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final Widget child;
+  const _SectionCard({required this.icon, required this.title, required this.child});
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: Colors.grey.shade200, width: 1.2),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                decoration: BoxDecoration(
+                  color: const Color(0xFF2196F3).withOpacity(0.12),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                padding: const EdgeInsets.all(10),
+                child: Icon(icon, color: const Color(0xFF2196F3), size: 28),
+              ),
+              const SizedBox(width: 12),
+              Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+            ],
+          ),
+          const SizedBox(height: 10),
+          child,
+        ],
       ),
     );
   }

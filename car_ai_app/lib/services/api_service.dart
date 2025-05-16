@@ -79,6 +79,7 @@ class ApiService {
               return CarModel(
                 imagePath: imageFile.path,
                 carName: carName,
+                brand: data['Brand'] ?? data['brand'] ?? '',
                 year: data['Year'] ?? data['year'] ?? '',
                 price: data['Price'] ?? data['price'] ?? '',
                 power: data['Power'] ?? data['power'] ?? '',
@@ -86,7 +87,9 @@ class ApiService {
                 topSpeed: data['Top Speed'] ?? data['top_speed'] ?? '',
                 engine: data['Engine'] ?? data['engine'] ?? '',
                 interior: data['Interior & Features'] ?? data['interior'] ?? '',
-                features: '', // Features are now part of interior
+                features: (data['features'] is List)
+                  ? List<String>.from(data['features'])
+                  : <String>[],
                 description: data['Description'] ?? data['description'] ?? '',
               );
             } catch (e) {
@@ -137,6 +140,28 @@ class ApiService {
         return MediaType('image', 'gif');
       default:
         return null;
+    }
+  }
+
+  Future<List<CarModel>> fetchHistory() async {
+    final uri = Uri.parse('${AppConstants.apiBaseUrl}/history');
+    final response = await http.get(uri);
+    if (response.statusCode == 200) {
+      final List<dynamic> data = jsonDecode(response.body);
+      return data.map((json) => CarModel.fromJson(json)).toList();
+    } else {
+      throw Exception('Failed to fetch history: ${response.statusCode}');
+    }
+  }
+
+  Future<List<CarModel>> fetchCollection([String collectionName = 'Favorites']) async {
+    final uri = Uri.parse('${AppConstants.apiBaseUrl}/collection?name=$collectionName');
+    final response = await http.get(uri);
+    if (response.statusCode == 200) {
+      final List<dynamic> data = jsonDecode(response.body);
+      return data.map((json) => CarModel.fromJson(json)).toList();
+    } else {
+      throw Exception('Failed to fetch collection: \\${response.statusCode}');
     }
   }
 } 

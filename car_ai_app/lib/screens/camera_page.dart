@@ -1,16 +1,21 @@
+import 'dart:convert';
 import 'dart:io';
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
+import 'result_page.dart';
+import 'history_page.dart';
+import 'home_page.dart';
 import '../config/constants.dart';
-import '../services/api_service.dart';
+import 'package:permission_handler/permission_handler.dart';
+import '../utils/error_handler.dart';
 import '../services/storage_service.dart';
 import '../models/car_model.dart';
-import 'result_page.dart';
 
 class CameraPage extends StatefulWidget {
   final String langCode;
-
   const CameraPage({super.key, required this.langCode});
 
   @override
@@ -20,276 +25,300 @@ class CameraPage extends StatefulWidget {
 class _CameraPageState extends State<CameraPage> {
   final ImagePicker _picker = ImagePicker();
   bool _isLoading = false;
-  String? _errorMessage;
-  XFile? _selectedImage;
-  bool _isCancelled = false;
-  int _retryCount = 0;
-  static const int maxRetries = 2;
 
-  @override
-  void dispose() {
-    _isCancelled = true;
-    super.dispose();
-  }
-
-  Future<void> _pickImage(ImageSource source) async {
+  Future<void> _getImage(ImageSource source) async {
     try {
+      setState(() => _isLoading = true);
+      
+      // Kiểm tra kết nối mạng
+      if (!await ErrorHandler.checkInternetConnection()) {
+        if (!mounted) return;
+        ErrorHandler.showErrorSnackBar(context, 'Không có kết nối mạng. Vui lòng kiểm tra lại.');
+        return;
+      }
+
       final XFile? image = await _picker.pickImage(
         source: source,
         maxWidth: 1920,
-        maxHeight: 1920,
+        maxHeight: 1080,
         imageQuality: 85,
       );
-      
-      if (image == null) return;
 
-      setState(() {
-        _selectedImage = image;
-        _errorMessage = null;
-        _isLoading = true;
-        _isCancelled = false;
-        _retryCount = 0;
-      });
+      if (image != null) {
+        // Gửi 2 request: 1 cho tiếng Anh, 1 cho tiếng Việt
+        final resultEn = await _analyzeImageWithLang(image.path, 'en');
+        final resultVi = await _analyzeImageWithLang(image.path, 'vi');
+        if (!mounted) return;
 
-      await _analyzeImage(image);
-    } catch (e) {
-      _handleError(e.toString());
-    }
-  }
+        if (resultEn['car_name'] == 'API error' || resultEn['car_name'] == 'Exception') {
+          ErrorHandler.showErrorSnackBar(context, resultEn[widget.langCode] ?? 'Error');
+          return;
+        }
 
-  Future<void> _analyzeImage(XFile image) async {
-    if (_isCancelled) return;
-
-    try {
-      final api = ApiService();
-      final car = await api.analyzeCarImage(File(image.path), widget.langCode);
-
-      if (_isCancelled || !mounted) return;
-
-      final storage = StorageService();
-      await storage.saveCarToHistory(car);
-
-      if (_isCancelled || !mounted) return;
-
-      setState(() {
-        _isLoading = false;
-        _errorMessage = null;
-      });
-
-      if (!mounted) return;
-      
-      await Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (_) => ResultPage(
+        // Lưu vào lịch sử
+        try {
+          final carModel = CarModel(
             imagePath: image.path,
-            carName: car.carName,
-            year: car.year,
-            price: car.price,
-            power: car.power,
-            acceleration: car.acceleration,
-            topSpeed: car.topSpeed,
-            engine: car.engine,
-            interior: car.interior,
-            features: car.features,
-            description: car.description,
-            langCode: widget.langCode,
-          ),
-        ),
-      );
+            carName: resultEn['car_name'] ?? '',
+            brand: resultEn['brand'] ?? '',
+            year: resultEn['year'] ?? '',
+            price: resultEn['price'] ?? '',
+            power: resultEn['power'] ?? '',
+            acceleration: resultEn['acceleration'] ?? '',
+            topSpeed: resultEn['top_speed'] ?? '',
+            engine: resultEn['engineDetail'] ?? '',
+            interior: resultEn['interior'] ?? '',
+            features: resultEn['features'] != null ? (resultEn['features'] as List).map((e) => e.toString()).toList() : [],
+            description: resultEn['description'] ?? '',
+            descriptionEn: resultEn['description'] ?? '',
+            descriptionVi: resultVi['description'] ?? '',
+            engineDetailEn: resultEn['engineDetail'] ?? '',
+            engineDetailVi: resultVi['engineDetail'] ?? '',
+            interiorEn: resultEn['interior'] ?? '',
+            interiorVi: resultVi['interior'] ?? '',
+          );
+
+          // Kiểm tra dữ liệu trước khi lưu
+          if (carModel.carName.isEmpty) {
+            throw Exception('Tên xe không được để trống');
+          }
+
+          // Lưu vào lịch sử
+          await StorageService().saveCarToHistory(carModel);
+          
+          // Đảm bảo collection 'Favorites' tồn tại trước khi lưu
+          try {
+            await StorageService().addCollection('Favorites');
+            await StorageService().saveCarToCollection(carModel, 'Favorites');
+          } catch (e) {
+            print('Error saving to collection: $e');
+          }
+          
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                widget.langCode == 'vi' 
+                  ? '✅ Đã lưu vào lịch sử và bộ sưu tập'
+                  : '✅ Saved to history and collection'
+              ),
+              backgroundColor: Colors.green,
+              duration: const Duration(seconds: 2),
+            ),
+          );
+
+          // Chuyển đến trang kết quả và quay về trang chủ
+          if (!mounted) return;
+          await Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => ResultPage(
+                imagePath: image.path,
+                carName: resultEn['car_name'] ?? '',
+                brand: resultEn['brand'] ?? '',
+                year: resultEn['year'] ?? '',
+                price: resultEn['price'] ?? '',
+                power: resultEn['power'] ?? '',
+                acceleration: resultEn['acceleration'] ?? '',
+                topSpeed: resultEn['top_speed'] ?? '',
+                description: widget.langCode == 'vi' ? resultVi['description'] : resultEn['description'],
+                features: resultEn['features'] != null ? List<String>.from(resultEn['features']) : [],
+                engineDetail: widget.langCode == 'vi' ? resultVi['engineDetail'] : resultEn['engineDetail'],
+                interior: widget.langCode == 'vi' ? resultVi['interior'] : resultEn['interior'],
+              ),
+            ),
+          );
+          
+          // Quay về trang chủ và chuyển đến tab lịch sử
+          if (!mounted) return;
+          Navigator.of(context).popUntil((route) => route.isFirst);
+          if (context.mounted) {
+            HomePage.switchToHistory(context);
+          }
+        } catch (e) {
+          if (!mounted) return;
+          ErrorHandler.showErrorSnackBar(
+            context, 
+            widget.langCode == 'vi'
+              ? '❌ Không thể lưu vào lịch sử: $e'
+              : '❌ Failed to save to history: $e'
+          );
+        }
+      }
     } catch (e) {
-      if (_isCancelled || !mounted) return;
-      _handleError(e.toString());
+      if (!mounted) return;
+      ErrorHandler.showErrorSnackBar(context, 'Không thể lấy ảnh. Vui lòng thử lại.');
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 
-  void _handleError(String error) {
-    if (!mounted || _isCancelled) return;
+  Future<Map<String, dynamic>> _analyzeImageWithLang(String imagePath, String lang) async {
+    final uri = Uri.parse('${AppConstants.apiBaseUrl}${AppConstants.analyzeEndpoint}');
+    final file = File(imagePath);
     
-    setState(() {
-      _errorMessage = error;
-      _isLoading = false;
-    });
+    try {
+      final fileSize = await file.length();
+      if (fileSize > 5 * 1024 * 1024) {
+        return {
+          "car_name": "File too large",
+          "year": "",
+          "price": "",
+          "interior": "",
+          "engine": "",
+          "vi": "⚠️ File ảnh quá lớn (>5MB). Vui lòng chọn ảnh nhỏ hơn.",
+          "en": "⚠️ Image file too large (>5MB). Please select a smaller image."
+        };
+      }
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          error,
-          style: const TextStyle(color: Colors.white),
-        ),
-        backgroundColor: Colors.red,
-        duration: const Duration(seconds: 5),
-        action: SnackBarAction(
-          label: AppConstants.messages[widget.langCode]!['retry']!,
-          textColor: Colors.white,
-          onPressed: () {
-            if (_selectedImage != null) {
-              _retryAnalysis();
-            }
-          },
-        ),
-      ),
-    );
+      final request = http.MultipartRequest('POST', uri)
+        ..fields['lang'] = lang
+        ..files.add(await http.MultipartFile.fromPath('image', imagePath));
+
+      final streamed = await request.send().timeout(const Duration(seconds: 10));
+      final response = await http.Response.fromStream(streamed);
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        if (data == null || data['car_name'] == null) {
+          return {
+            "car_name": "Invalid response",
+            "year": "",
+            "price": "",
+            "interior": "",
+            "engine": "",
+            "vi": "⚠️ Không nhận diện được xe trong ảnh",
+            "en": "⚠️ Could not recognize car in image"
+          };
+        }
+        return data;
+      } else {
+        return {
+          "car_name": "API error",
+          "year": "",
+          "price": "",
+          "interior": "",
+          "engine": "",
+          "vi": "⚠️ Lỗi máy chủ: ${response.statusCode}",
+          "en": "⚠️ Server error: ${response.statusCode}"
+        };
+      }
+    } on SocketException {
+      return {
+        "car_name": "Connection Error",
+        "year": "",
+        "price": "",
+        "interior": "",
+        "engine": "",
+        "vi": '🚫 Không thể kết nối đến máy chủ. Vui lòng kiểm tra:\n1. Kết nối mạng\n2. Địa chỉ IP máy chủ\n3. Cửa sổ terminal đang chạy Flask',
+        "en": '🚫 Cannot connect to server. Please check:\n1. Network connection\n2. Server IP address\n3. Flask terminal window'
+      };
+    } on TimeoutException {
+      return {
+        "car_name": "Timeout",
+        "year": "",
+        "price": "",
+        "interior": "",
+        "engine": "",
+        "vi": '⏱️ Quá thời gian chờ phản hồi (10 giây).\nVui lòng kiểm tra:\n1. Kết nối mạng\n2. Địa chỉ IP máy chủ\n3. Cửa sổ terminal đang chạy Flask',
+        "en": '⏱️ Response timeout (10 seconds).\nPlease check:\n1. Network connection\n2. Server IP address\n3. Flask terminal window'
+      };
+    } catch (e) {
+      return {
+        "car_name": "Error",
+        "year": "",
+        "price": "",
+        "interior": "",
+        "engine": "",
+        "vi": '❌ Lỗi: $e',
+        "en": '❌ Error: $e'
+      };
+    }
   }
 
-  Future<void> _retryAnalysis() async {
-    if (_selectedImage == null || _retryCount >= maxRetries) {
-      _handleError(widget.langCode == 'vi'
-          ? 'Đã thử lại nhiều lần không thành công. Vui lòng chọn ảnh khác.'
-          : 'Multiple retry attempts failed. Please try another image.');
-      return;
+  Future<void> _checkPermissionAndGetImage(ImageSource source) async {
+    if (source == ImageSource.camera) {
+      final status = await Permission.camera.request();
+      if (status.isGranted) {
+        _getImage(source);
+      } else {
+        if (!mounted) return;
+        ErrorHandler.showErrorSnackBar(context, 'Cần quyền truy cập camera để sử dụng tính năng này');
+      }
+    } else {
+      _getImage(source);
     }
-    
-    setState(() {
-      _isLoading = true;
-      _errorMessage = null;
-      _isCancelled = false;
-      _retryCount++;
-    });
-    
-    await _analyzeImage(_selectedImage!);
   }
 
   @override
   Widget build(BuildContext context) {
     final isVi = widget.langCode == 'vi';
-    final theme = Theme.of(context);
-
-    return WillPopScope(
-      onWillPop: () async {
-        if (_isLoading) {
-          setState(() {
-            _isCancelled = true;
-            _isLoading = false;
-          });
-          return false;
-        }
-        return true;
-      },
-      child: Scaffold(
-        appBar: AppBar(
-          title: Text(isVi ? 'Chụp ảnh xe' : 'Take Car Photo'),
-          leading: IconButton(
-            icon: const Icon(Icons.arrow_back),
-            onPressed: () {
-              if (_isLoading) {
-                setState(() {
-                  _isCancelled = true;
-                  _isLoading = false;
-                });
-              }
-              Navigator.of(context).pop();
-            },
-          ),
-        ),
-        body: Stack(
-          children: [
-            Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  if (_selectedImage != null) ...[
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(12),
-                      child: Image.file(
-                        File(_selectedImage!.path),
-                        height: 200,
-                        width: double.infinity,
-                        fit: BoxFit.cover,
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-                  ],
-                  Icon(
-                    Icons.camera_alt,
-                    size: 64,
-                    color: theme.primaryColor,
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    isVi ? 'Chọn ảnh từ:' : 'Choose image from:',
-                    style: theme.textTheme.titleLarge,
-                  ),
-                  const SizedBox(height: 24),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      ElevatedButton.icon(
-                        onPressed: _isLoading ? null : () => _pickImage(ImageSource.camera),
-                        icon: const Icon(Icons.camera_alt),
-                        label: Text(isVi ? 'Camera' : 'Camera'),
-                      ),
-                      const SizedBox(width: 16),
-                      ElevatedButton.icon(
-                        onPressed: _isLoading ? null : () => _pickImage(ImageSource.gallery),
-                        icon: const Icon(Icons.photo_library),
-                        label: Text(isVi ? 'Thư viện' : 'Gallery'),
-                      ),
-                    ],
-                  ),
-                  if (_errorMessage != null) ...[
-                    const SizedBox(height: 16),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 24),
-                      child: Text(
-                        _errorMessage!,
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          color: Colors.red,
-                        ),
-                        textAlign: TextAlign.center,
-                      ),
-                    ),
-                  ],
-                ],
+    return Stack(
+      children: [
+        Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(
+                Icons.camera_alt,
+                size: 80,
+                color: Color(0xFF2196F3),
               ),
-            ),
-            if (_isLoading)
-              Container(
-                color: Colors.black54,
-                child: Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const CircularProgressIndicator(),
-                      const SizedBox(height: 16),
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 32),
-                        child: Text(
-                          isVi 
-                            ? 'Đang phân tích ảnh...\nVui lòng đợi trong giây lát'
-                            : 'Analyzing image...\nPlease wait a moment',
-                          style: theme.textTheme.titleMedium?.copyWith(
-                            color: Colors.white,
-                          ),
-                          textAlign: TextAlign.center,
-                        ),
-                      ),
-                      const SizedBox(height: 24),
-                      TextButton.icon(
-                        onPressed: () {
-                          setState(() {
-                            _isCancelled = true;
-                            _isLoading = false;
-                          });
-                        },
-                        icon: const Icon(
-                          Icons.cancel,
-                          color: Colors.white,
-                        ),
-                        label: Text(
-                          isVi ? 'Hủy phân tích' : 'Cancel analysis',
-                          style: theme.textTheme.bodyMedium?.copyWith(
-                            color: Colors.white,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
+              const SizedBox(height: 24),
+              Text(
+                isVi ? 'Chụp ảnh xe' : 'Take Car Photo',
+                style: const TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
                 ),
               ),
-          ],
+              const SizedBox(height: 16),
+              Text(
+                isVi 
+                  ? 'Đặt xe vào khung hình và chụp ảnh rõ nét'
+                  : 'Place the car in frame and take a clear photo',
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  fontSize: 16,
+                  color: Colors.black54,
+                ),
+              ),
+              const SizedBox(height: 32),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  ElevatedButton.icon(
+                    onPressed: _isLoading ? null : () => _checkPermissionAndGetImage(ImageSource.camera),
+                    icon: const Icon(Icons.camera_alt),
+                    label: Text(isVi ? 'Máy ảnh' : 'Camera'),
+                    style: ElevatedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  ElevatedButton.icon(
+                    onPressed: _isLoading ? null : () => _checkPermissionAndGetImage(ImageSource.gallery),
+                    icon: const Icon(Icons.photo_library),
+                    label: Text(isVi ? 'Thư viện' : 'Gallery'),
+                    style: ElevatedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
-      ),
+        if (_isLoading)
+          Container(
+            color: Colors.black.withOpacity(0.5),
+            child: const Center(
+              child: CircularProgressIndicator(),
+            ),
+          ),
+      ],
     );
   }
 } 
