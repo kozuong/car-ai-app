@@ -16,6 +16,12 @@ class ResultPage extends StatelessWidget {
   final String? engineDetail;
   final String? interior;
   final Map<String, dynamic>? resultEn;
+  final String? descriptionVi;
+  final String? descriptionEn;
+  final String? engineDetailVi;
+  final String? engineDetailEn;
+  final String? interiorVi;
+  final String? interiorEn;
 
   const ResultPage({
     super.key,
@@ -32,6 +38,12 @@ class ResultPage extends StatelessWidget {
     this.engineDetail,
     this.interior,
     this.resultEn,
+    this.descriptionVi,
+    this.descriptionEn,
+    this.engineDetailVi,
+    this.engineDetailEn,
+    this.interiorVi,
+    this.interiorEn,
   });
 
   @override
@@ -140,7 +152,9 @@ class ResultPage extends StatelessWidget {
                     icon: Icons.description,
                     title: isVi ? 'Mô tả' : 'Description',
                     child: Text(
-                      isVi ? (resultEn?['description'] ?? 'No description.') : (description ?? 'No description.'),
+                      isVi
+                        ? (descriptionVi ?? description ?? 'No description.')
+                        : (descriptionEn ?? description ?? 'No description.'),
                       style: const TextStyle(fontSize: 15),
                     ),
                   ),
@@ -151,7 +165,9 @@ class ResultPage extends StatelessWidget {
                       icon: Icons.engineering,
                       title: isVi ? 'Chi tiết động cơ' : 'Engine Details',
                       child: Text(
-                        isVi ? (resultEn?['engine_detail'] ?? '') : engineDetail!,
+                        isVi
+                          ? (engineDetailVi ?? engineDetail ?? '')
+                          : (engineDetailEn ?? engineDetail ?? ''),
                         style: const TextStyle(fontSize: 15),
                       ),
                     ),
@@ -163,7 +179,9 @@ class ResultPage extends StatelessWidget {
                       icon: Icons.chair_alt,
                       title: isVi ? 'Nội thất & Tính năng' : 'Interior & Features',
                       child: Text(
-                        isVi ? (resultEn?['interior'] ?? '') : interior!,
+                        isVi
+                          ? (interiorVi ?? interior ?? '')
+                          : (interiorEn ?? interior ?? ''),
                         style: const TextStyle(fontSize: 15),
                       ),
                     ),
