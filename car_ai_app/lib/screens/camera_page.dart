@@ -125,6 +125,7 @@ class _CameraPageState extends State<CameraPage> {
                 features: resultEn['features'] != null ? List<String>.from(resultEn['features']) : [],
                 engineDetail: widget.langCode == 'vi' ? resultVi['engineDetail'] : resultEn['engineDetail'],
                 interior: widget.langCode == 'vi' ? resultVi['interior'] : resultEn['interior'],
+                resultEn: resultEn,
               ),
             ),
           );
@@ -194,15 +195,38 @@ class _CameraPageState extends State<CameraPage> {
           };
         }
         return data;
+      } else if (response.statusCode == 404) {
+        final data = jsonDecode(response.body);
+        return {
+          "car_name": "API not found",
+          "year": "",
+          "price": "",
+          "interior": "",
+          "engine": "",
+          "vi": data['vi'] ?? "⚠️ Không tìm thấy API. Vui lòng kiểm tra lại địa chỉ máy chủ.",
+          "en": data['en'] ?? "⚠️ API not found. Please check server address."
+        };
+      } else if (response.statusCode == 400) {
+        final data = jsonDecode(response.body);
+        return {
+          "car_name": "Bad request",
+          "year": "",
+          "price": "",
+          "interior": "",
+          "engine": "",
+          "vi": data['vi'] ?? "⚠️ Yêu cầu không hợp lệ. Vui lòng thử lại.",
+          "en": data['en'] ?? "⚠️ Bad request. Please try again."
+        };
       } else {
+        final data = jsonDecode(response.body);
         return {
           "car_name": "API error",
           "year": "",
           "price": "",
           "interior": "",
           "engine": "",
-          "vi": "⚠️ Lỗi máy chủ: ${response.statusCode}",
-          "en": "⚠️ Server error: ${response.statusCode}"
+          "vi": data['vi'] ?? "⚠️ Lỗi máy chủ: ${response.statusCode}",
+          "en": data['en'] ?? "⚠️ Server error: ${response.statusCode}"
         };
       }
     } on SocketException {

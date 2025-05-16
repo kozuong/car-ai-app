@@ -1,0 +1,18 @@
+# Python backend
+car-ai-backend/venv/
+car-ai-backend/.venv/
+car-ai-backend/__pycache__/
+car-ai-backend/*.pyc
+car-ai-backend/.env
+
+# Flutter frontend
+car_ai_app/build/
+car_ai_app/.dart_tool/
+car_ai_app/.packages
+car_ai_app/.flutter-plugins
+car_ai_app/.idea/
+car_ai_app/.vscode/
+car_ai_app/pubspec.lock
+
+# General
+*.log 

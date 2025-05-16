@@ -15,6 +15,7 @@ class ResultPage extends StatelessWidget {
   final List<String>? features;
   final String? engineDetail;
   final String? interior;
+  final Map<String, dynamic>? resultEn;
 
   const ResultPage({
     super.key,
@@ -30,6 +31,7 @@ class ResultPage extends StatelessWidget {
     this.features,
     this.engineDetail,
     this.interior,
+    this.resultEn,
   });
 
   @override
@@ -138,7 +140,7 @@ class ResultPage extends StatelessWidget {
                     icon: Icons.description,
                     title: isVi ? 'Mô tả' : 'Description',
                     child: Text(
-                      description ?? (isVi ? 'Không có mô tả.' : 'No description.'),
+                      isVi ? (resultEn?['description'] ?? 'No description.') : (description ?? 'No description.'),
                       style: const TextStyle(fontSize: 15),
                     ),
                   ),
@@ -149,7 +151,7 @@ class ResultPage extends StatelessWidget {
                       icon: Icons.engineering,
                       title: isVi ? 'Chi tiết động cơ' : 'Engine Details',
                       child: Text(
-                        engineDetail!,
+                        isVi ? (resultEn?['engine_detail'] ?? '') : engineDetail!,
                         style: const TextStyle(fontSize: 15),
                       ),
                     ),
@@ -161,7 +163,7 @@ class ResultPage extends StatelessWidget {
                       icon: Icons.chair_alt,
                       title: isVi ? 'Nội thất & Tính năng' : 'Interior & Features',
                       child: Text(
-                        interior!,
+                        isVi ? (resultEn?['interior'] ?? '') : interior!,
                         style: const TextStyle(fontSize: 15),
                       ),
                     ),

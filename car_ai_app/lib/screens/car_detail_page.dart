@@ -133,7 +133,7 @@ class CarDetailPage extends StatelessWidget {
                       icon: Icons.description,
                       title: isVi ? 'Mô tả' : 'Description',
                       child: Text(
-                        overview.isNotEmpty ? overview : (isVi ? 'Không có mô tả.' : 'No description.'),
+                        isVi ? (car.descriptionEn ?? 'No description.') : (overview.isNotEmpty ? overview : 'No description.'),
                         style: const TextStyle(fontSize: 15),
                       ),
                     ),
@@ -144,7 +144,7 @@ class CarDetailPage extends StatelessWidget {
                         icon: Icons.engineering,
                         title: isVi ? 'Chi tiết động cơ' : 'Engine Details',
                         child: Text(
-                          car.engine,
+                          isVi ? (car.engineDetailEn ?? '') : car.engine,
                           style: const TextStyle(fontSize: 15),
                         ),
                       ),
@@ -156,7 +156,7 @@ class CarDetailPage extends StatelessWidget {
                         icon: Icons.chair_alt,
                         title: isVi ? 'Nội thất & Tính năng' : 'Interior & Features',
                         child: Text(
-                          car.interior,
+                          isVi ? (car.interiorEn ?? '') : car.interior,
                           style: const TextStyle(fontSize: 15),
                         ),
                       ),
